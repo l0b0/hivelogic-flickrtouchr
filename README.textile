@@ -13,3 +13,8 @@ python flickrtouchr.py FlickrBackupFolder
 
 You'll be prompted to authorize with Flickr, and then the magic happens.
 
+To verify PEP8 compliance (using another Python version if you want to):
+
+<pre>
+make PYTHON_VERSION=2.6.9 test
+</pre>
