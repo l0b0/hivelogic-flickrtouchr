@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 #
-# FlickrTouchr - a simple python script to grab all your photos from flickr, 
-#                dump into a directory - organised into folders by set - 
+# FlickrTouchr - a simple python script to grab all your photos from flickr,
+#                dump into a directory - organised into folders by set -
 #                along with any favourites you have saved.
 #
 #                You can then sync the photos to an iPod touch.
@@ -11,7 +11,7 @@
 #
 # Original Author:	colm - AT - allcosts.net  - Colm MacCarthaigh - 2008-01-21
 #
-# Modified by:			Dan Benjamin - http://hivelogic.com										
+# Modified by:			Dan Benjamin - http://hivelogic.com
 #
 # License:       		Apache 2.0 - http://www.apache.org/licenses/LICENSE-2.0.html
 #
@@ -26,8 +26,13 @@ import hashlib
 import sys
 import os
 
-API_KEY       = "e224418b91b4af4e8cdb0564716fa9bd"
+API_KEY = "e224418b91b4af4e8cdb0564716fa9bd"
 SHARED_SECRET = "7cddb9c9716501a0"
+
+API_SERVICES_URL = 'https://api.flickr.com/services/'
+API_REST_URL = API_SERVICES_URL + 'rest/'
+API_AUTH_URL = API_SERVICES_URL + 'auth/'
+
 
 #
 # Utility functions for dealing with flickr authentication
@@ -39,29 +44,31 @@ def getText(nodelist):
             rc = rc + node.data
     return rc.encode("utf-8")
 
+
 #
 # Get the frob based on our API_KEY and shared secret
 #
 def getfrob():
     # Create our signing string
     string = SHARED_SECRET + "api_key" + API_KEY + "methodflickr.auth.getFrob"
-    hash   = hashlib.md5(string).hexdigest()
+    hash = hashlib.md5(string).hexdigest()
 
     # Formulate the request
-    url    = "https://api.flickr.com/services/rest/?method=flickr.auth.getFrob"
-    url   += "&api_key=" + API_KEY + "&api_sig=" + hash
+    url = API_REST_URL
+    url += "?method=flickr.auth.getFrob"
+    url += "&api_key=" + API_KEY + "&api_sig=" + hash
 
     try:
         # Make the request and extract the frob
         response = urllib2.urlopen(url)
-    
+
         # Parse the XML
         dom = xml.dom.minidom.parse(response)
 
         # get the frob
         frob = getText(dom.getElementsByTagName("frob")[0].childNodes)
 
-        # Free the DOM 
+        # Free the DOM
         dom.unlink()
 
         # Return the frob
@@ -70,17 +77,19 @@ def getfrob():
     except:
         raise Exception("Could not retrieve frob")
 
+
 #
 # Login and get a token
 #
 def froblogin(frob, perms):
-    string = SHARED_SECRET + "api_key" + API_KEY + "frob" + frob + "perms" + perms
-    hash   = hashlib.md5(string).hexdigest()
+    string = SHARED_SECRET + "api_key" + API_KEY + \
+        "frob" + frob + "perms" + perms
+    hash = hashlib.md5(string).hexdigest()
 
     # Formulate the request
-    url    = "https://api.flickr.com/services/auth/?"
-    url   += "api_key=" + API_KEY + "&perms=" + perms
-    url   += "&frob=" + frob + "&api_sig=" + hash
+    url = API_AUTH_URL
+    url += "?api_key=" + API_KEY + "&perms=" + perms
+    url += "&frob=" + frob + "&api_sig=" + hash
 
     # Tell the user what's happening
     print "In order to allow FlickrTouchr to read your photos and favourites"
@@ -89,7 +98,7 @@ def froblogin(frob, perms):
     print "automatically)."
     print
     print url
-    print 
+    print
     print "Waiting for you to press return"
 
     # We now have a login url, open it in a web-browser
@@ -99,25 +108,26 @@ def froblogin(frob, perms):
     sys.stdin.readline()
 
     # Now, try and retrieve a token
-    string = SHARED_SECRET + "api_key" + API_KEY + "frob" + frob + "methodflickr.auth.getToken"
-    hash   = hashlib.md5(string).hexdigest()
-    
+    string = SHARED_SECRET + "api_key" + API_KEY + "frob" + frob + \
+        "methodflickr.auth.getToken"
+    hash = hashlib.md5(string).hexdigest()
+
     # Formulate the request
-    url    = "https://api.flickr.com/services/rest/?method=flickr.auth.getToken"
-    url   += "&api_key=" + API_KEY + "&frob=" + frob
-    url   += "&api_sig=" + hash
+    url = API_REST_URL + "?method=flickr.auth.getToken"
+    url += "&api_key=" + API_KEY + "&frob=" + frob
+    url += "&api_sig=" + hash
 
     # See if we get a token
     try:
         # Make the request and extract the frob
         response = urllib2.urlopen(url)
-    
+
         # Parse the XML
         dom = xml.dom.minidom.parse(response)
 
         # get the token and user-id
         token = getText(dom.getElementsByTagName("token")[0].childNodes)
-        nsid  = dom.getElementsByTagName("user")[0].getAttribute("nsid")
+        nsid = dom.getElementsByTagName("user")[0].getAttribute("nsid")
 
         # Free the DOM
         dom.unlink()
@@ -127,28 +137,30 @@ def froblogin(frob, perms):
     except:
         raise Exception("Login failed")
 
-# 
+
+#
 # Sign an arbitrary flickr request with a token
-# 
+#
 def flickrsign(url, token):
-    query  = urlparse.urlparse(url).query
+    query = urlparse.urlparse(url).query
     query += "&api_key=" + API_KEY + "&auth_token=" + token
-    params = query.split('&') 
+    params = query.split('&')
 
     # Create the string to hash
     string = SHARED_SECRET
-    
+
     # Sort the arguments alphabettically
     params.sort()
     for param in params:
         string += param.replace('=', '')
-    hash   = hashlib.md5(string).hexdigest()
+    hash = hashlib.md5(string).hexdigest()
 
     # Now, append the api_key, and the api_sig args
     url += "&api_key=" + API_KEY + "&auth_token=" + token + "&api_sig=" + hash
-    
+
     # Return the signed url
     return url
+
 
 #
 # Grab the photo from the server
@@ -156,28 +168,27 @@ def flickrsign(url, token):
 def getphoto(id, token, filename):
     try:
         # Contruct a request to find the sizes
-        url  = "https://api.flickr.com/services/rest/?method=flickr.photos.getSizes"
+        url = API_REST_URL + "?method=flickr.photos.getSizes"
         url += "&photo_id=" + id
-    
+
         # Sign the request
         url = flickrsign(url, token)
-    
+
         # Make the request
         response = urllib2.urlopen(url)
-        
+
         # Parse the XML
         dom = xml.dom.minidom.parse(response)
 
         # Get the list of sizes
-        sizes =  dom.getElementsByTagName("size")
+        sizes = dom.getElementsByTagName("size")
 
         # Grab the original if it exists
         allowedTags = ("Original", "Video Original", "Large")
         if (sizes[-1].getAttribute("label") in allowedTags):
-          imgurl = sizes[-1].getAttribute("source")
+            imgurl = sizes[-1].getAttribute("source")
         else:
-          print "Failed to get original for photo id " + id
-
+            print "Failed to get original for photo id " + id
 
         # Free the DOM memory
         dom.unlink()
@@ -185,7 +196,7 @@ def getphoto(id, token, filename):
         # Grab the image file
         response = urllib2.urlopen(imgurl)
         data = response.read()
-    
+
         # Save the file!
         fh = open(filename, "w")
         fh.write(data)
@@ -194,15 +205,16 @@ def getphoto(id, token, filename):
         return filename
     except:
         print "Failed to retrieve photo id " + id
-    
-######## Main Application ##########
+
+
+# Main Application
 if __name__ == '__main__':
 
     # The first, and only argument needs to be a directory
     try:
         os.chdir(sys.argv[1])
     except:
-        print "usage: %s directory" % sys.argv[0] 
+        print "usage: %s directory" % sys.argv[0]
         sys.exit(1)
 
     # First things first, see if we have a cached user and auth-token
@@ -214,7 +226,7 @@ if __name__ == '__main__':
     # We don't - get a new one
     except:
         (user, token) = froblogin(getfrob(), "read")
-        config = { "version":1 , "user":user, "token":token }  
+        config = {"version": 1, "user": user, "token": token}
 
         # Save it for future use
         cache = open("touchr.frob.cache", "w")
@@ -222,47 +234,50 @@ if __name__ == '__main__':
         cache.close()
 
     # Now, construct a query for the list of photo sets
-    url  = "https://api.flickr.com/services/rest/?method=flickr.photosets.getList"
+    url = API_REST_URL + "?method=flickr.photosets.getList"
     url += "&user_id=" + config["user"]
-    url  = flickrsign(url, config["token"])
+    url = flickrsign(url, config["token"])
 
     # get the result
     response = urllib2.urlopen(url)
-    
+
     # Parse the XML
     dom = xml.dom.minidom.parse(response)
 
     # Get the list of Sets
-    sets =  dom.getElementsByTagName("photoset")
+    sets = dom.getElementsByTagName("photoset")
 
     # For each set - create a url
     urls = []
     for set in sets:
         pid = set.getAttribute("id")
         dir = getText(set.getElementsByTagName("title")[0].childNodes)
-        dir = unicodedata.normalize('NFKD', dir.decode("utf-8", "ignore")).encode('ASCII', 'ignore') # Normalize to ASCII
+        # Normalize to ASCII
+        dir = unicodedata.normalize(
+            'NFKD',
+            dir.decode("utf-8", "ignore")).encode('ASCII', 'ignore')
 
         # Build the list of photos
-        url   = "https://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos"
-        url  += "&photoset_id=" + pid
+        url = API_REST_URL + "?method=flickr.photosets.getPhotos"
+        url += "&photoset_id=" + pid
 
         # Append to our list of urls
-        urls.append( (url , dir) )
-    
+        urls.append((url, dir))
+
     # Free the DOM memory
     dom.unlink()
 
     # Add the photos which are not in any set
-    url   = "https://api.flickr.com/services/rest/?method=flickr.photos.getNotInSet"
-    urls.append( (url, "No Set") )
+    url = API_REST_URL + "?method=flickr.photos.getNotInSet"
+    urls.append((url, "No Set"))
 
     # Add the user's Favourites
-    url   = "https://api.flickr.com/services/rest/?method=flickr.favorites.getList"
-    urls.append( (url, "Favourites") )
+    url = API_REST_URL + "?method=flickr.favorites.getList"
+    urls.append((url, "Favourites"))
 
     # Time to get the photos
     inodes = {}
-    for (url , dir) in urls:
+    for (url, dir) in urls:
         # Create the directory
         try:
             os.makedirs(dir)
@@ -273,7 +288,7 @@ if __name__ == '__main__':
         url += "&per_page=500"
         pages = page = 1
 
-        while page <= pages: 
+        while page <= pages:
             request = url + "&page=" + str(page)
 
             # Sign the url
@@ -287,7 +302,8 @@ if __name__ == '__main__':
 
             # Get the total
             try:
-                pages = int(dom.getElementsByTagName("photo")[0].parentNode.getAttribute("pages"))
+                pages = int(dom.getElementsByTagName(
+                    "photo")[0].parentNode.getAttribute("pages"))
             except IndexError:
                 pages = 0
 
@@ -309,14 +325,17 @@ if __name__ == '__main__':
                     continue
                 else:
                     print ''
-                    print photo.getAttribute("title").encode("utf8") + " ... in set ... " + dir
-                
+                    print photo.getAttribute("title").encode("utf8") + \
+                        " ... in set ... " + dir
+
                 # Look it up in our dictionary of inodes first
-                if photoid in inodes and inodes[photoid] and os.access(inodes[photoid], os.R_OK):
+                if photoid in inodes and inodes[photoid] and \
+                        os.access(inodes[photoid], os.R_OK):
                     # woo, we have it already, use a hard-link
                     os.link(inodes[photoid], target)
                 else:
-                    inodes[photoid] = getphoto(photo.getAttribute("id"), config["token"], target)
+                    inodes[photoid] = getphoto(
+                        photo.getAttribute("id"), config["token"], target)
 
             # Move on the next page
             page = page + 1
