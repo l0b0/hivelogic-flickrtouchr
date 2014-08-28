@@ -191,9 +191,7 @@ def __get_web_page(page_url):
     return urllib2.urlopen(page_url)
 
 
-# Main Application
-if __name__ == '__main__':
-
+def main():
     # The first, and only argument needs to be a directory
     try:
         os.chdir(sys.argv[1])
@@ -317,3 +315,7 @@ if __name__ == '__main__':
             # Move on the next page
             page = page + 1
     print ""
+
+
+if __name__ == '__main__':
+    main()
