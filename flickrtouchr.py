@@ -35,10 +35,7 @@ API_REST_URL = API_SERVICES_URL + 'rest/'
 API_AUTH_URL = API_SERVICES_URL + 'auth/'
 
 
-#
-# Utility functions for dealing with flickr authentication
-#
-def get_text(nodelist):
+def get_text_nodes_string(nodelist):
     rc = ""
     for node in nodelist:
         if node.nodeType == node.TEXT_NODE:
@@ -46,10 +43,7 @@ def get_text(nodelist):
     return rc.encode("utf-8")
 
 
-#
-# Get the frob based on our API_KEY and shared secret
-#
-def getfrob():
+def get_frob():
     # Create our signing string
     string = SHARED_SECRET + "api_key" + API_KEY + "methodflickr.auth.getFrob"
     hash = hashlib.md5(string).hexdigest()
@@ -63,7 +57,8 @@ def getfrob():
         dom = __get_web_page_dom(url)
 
         # get the frob
-        frob = get_text(dom.getElementsByTagName("frob")[0].childNodes)
+        frob = get_text_nodes_string(
+            dom.getElementsByTagName("frob")[0].childNodes)
 
         # Free the DOM
         dom.unlink()
@@ -75,10 +70,7 @@ def getfrob():
         raise Exception("Could not retrieve frob")
 
 
-#
-# Login and get a token
-#
-def froblogin(frob, perms):
+def get_authorization(frob, perms):
     string = SHARED_SECRET + "api_key" + API_KEY + \
         "frob" + frob + "perms" + perms
     hash = hashlib.md5(string).hexdigest()
@@ -119,7 +111,8 @@ def froblogin(frob, perms):
         dom = __get_web_page_dom(url)
 
         # get the token and user-id
-        token = get_text(dom.getElementsByTagName("token")[0].childNodes)
+        token = get_text_nodes_string(
+            dom.getElementsByTagName("token")[0].childNodes)
         nsid = dom.getElementsByTagName("user")[0].getAttribute("nsid")
 
         # Free the DOM
@@ -131,10 +124,7 @@ def froblogin(frob, perms):
         raise Exception("Login failed")
 
 
-#
-# Sign an arbitrary flickr request with a token
-#
-def flickrsign(url, token):
+def sign_request(url, token):
     query = urlparse.urlparse(url).query
     query += "&api_key=" + API_KEY + "&auth_token=" + token
     params = query.split('&')
@@ -155,17 +145,14 @@ def flickrsign(url, token):
     return url
 
 
-#
-# Grab the photo from the server
-#
-def getphoto(id, token, filename):
+def get_photo(id, token, filename):
     try:
         # Contruct a request to find the sizes
         url = API_REST_URL + "?method=flickr.photos.getSizes"
         url += "&photo_id=" + id
 
         # Sign the request
-        url = flickrsign(url, token)
+        url = sign_request(url, token)
 
         dom = __get_web_page_dom(url)
 
@@ -222,7 +209,7 @@ if __name__ == '__main__':
 
     # We don't - get a new one
     except:
-        (user, token) = froblogin(getfrob(), "read")
+        (user, token) = get_authorization(get_frob(), "read")
         config = {"version": 1, "user": user, "token": token}
 
         # Save it for future use
@@ -233,7 +220,7 @@ if __name__ == '__main__':
     # Now, construct a query for the list of photo sets
     url = API_REST_URL + "?method=flickr.photosets.getList"
     url += "&user_id=" + config["user"]
-    url = flickrsign(url, config["token"])
+    url = sign_request(url, config["token"])
 
     dom = __get_web_page_dom(url)
 
@@ -244,7 +231,8 @@ if __name__ == '__main__':
     urls = []
     for set in sets:
         pid = set.getAttribute("id")
-        dir = get_text(set.getElementsByTagName("title")[0].childNodes)
+        dir = get_text_nodes_string(
+            set.getElementsByTagName("title")[0].childNodes)
         # Normalize to ASCII
         dir = unicodedata.normalize(
             'NFKD',
@@ -285,7 +273,7 @@ if __name__ == '__main__':
             request = url + "&page=" + str(page)
 
             # Sign the url
-            request = flickrsign(request, config["token"])
+            request = sign_request(request, config["token"])
 
             dom = __get_web_page_dom(request)
 
@@ -323,7 +311,7 @@ if __name__ == '__main__':
                     # woo, we have it already, use a hard-link
                     os.link(inodes[photoid], target)
                 else:
-                    inodes[photoid] = getphoto(
+                    inodes[photoid] = get_photo(
                         photo.getAttribute("id"), config["token"], target)
 
             # Move on the next page
