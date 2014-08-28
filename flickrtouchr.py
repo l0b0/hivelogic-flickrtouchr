@@ -59,11 +59,7 @@ def getfrob():
     url += "&api_key=" + API_KEY + "&api_sig=" + hash
 
     try:
-        # Make the request and extract the frob
-        response = urllib2.urlopen(url)
-
-        # Parse the XML
-        dom = xml.dom.minidom.parse(response)
+        dom = __get_web_page_dom(url)
 
         # get the frob
         frob = getText(dom.getElementsByTagName("frob")[0].childNodes)
@@ -119,11 +115,7 @@ def froblogin(frob, perms):
 
     # See if we get a token
     try:
-        # Make the request and extract the frob
-        response = urllib2.urlopen(url)
-
-        # Parse the XML
-        dom = xml.dom.minidom.parse(response)
+        dom = __get_web_page_dom(url)
 
         # get the token and user-id
         token = getText(dom.getElementsByTagName("token")[0].childNodes)
@@ -174,11 +166,7 @@ def getphoto(id, token, filename):
         # Sign the request
         url = flickrsign(url, token)
 
-        # Make the request
-        response = urllib2.urlopen(url)
-
-        # Parse the XML
-        dom = xml.dom.minidom.parse(response)
+        dom = __get_web_page_dom(url)
 
         # Get the list of sizes
         sizes = dom.getElementsByTagName("size")
@@ -205,6 +193,14 @@ def getphoto(id, token, filename):
         return filename
     except:
         print "Failed to retrieve photo id " + id
+
+
+def __get_web_page_dom(page_url):
+    return xml.dom.minidom.parse(__get_web_page(page_url))
+
+
+def __get_web_page(page_url):
+    return urllib2.urlopen(page_url)
 
 
 # Main Application
@@ -238,11 +234,7 @@ if __name__ == '__main__':
     url += "&user_id=" + config["user"]
     url = flickrsign(url, config["token"])
 
-    # get the result
-    response = urllib2.urlopen(url)
-
-    # Parse the XML
-    dom = xml.dom.minidom.parse(response)
+    dom = __get_web_page_dom(url)
 
     # Get the list of Sets
     sets = dom.getElementsByTagName("photoset")
@@ -294,11 +286,7 @@ if __name__ == '__main__':
             # Sign the url
             request = flickrsign(request, config["token"])
 
-            # Make the request
-            response = urllib2.urlopen(request)
-
-            # Parse the XML
-            dom = xml.dom.minidom.parse(response)
+            dom = __get_web_page_dom(request)
 
             # Get the total
             try:
