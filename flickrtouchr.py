@@ -132,7 +132,7 @@ def sign_request(url, token):
     # Create the string to hash
     string = SHARED_SECRET
 
-    # Sort the arguments alphabettically
+    # Sort the arguments alphabetically
     params.sort()
     for param in params:
         string += param.replace('=', '')
@@ -147,7 +147,7 @@ def sign_request(url, token):
 
 def get_photo(id, token, filename):
     try:
-        # Contruct a request to find the sizes
+        # Construct a request to find the sizes
         url = API_REST_URL + "?method=flickr.photos.getSizes"
         url += "&photo_id=" + id
 
