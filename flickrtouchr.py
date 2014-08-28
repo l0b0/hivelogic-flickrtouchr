@@ -165,9 +165,8 @@ def get_photo(id, token, filename):
             imgurl = sizes[-1].getAttribute("source")
         else:
             print "Failed to get original for photo id " + id
-
-        # Free the DOM memory
-        dom.unlink()
+            dom.unlink()
+            return
 
         # Grab the image file
         response = urllib2.urlopen(imgurl)
