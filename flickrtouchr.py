@@ -38,7 +38,7 @@ API_AUTH_URL = API_SERVICES_URL + 'auth/'
 #
 # Utility functions for dealing with flickr authentication
 #
-def getText(nodelist):
+def get_text(nodelist):
     rc = ""
     for node in nodelist:
         if node.nodeType == node.TEXT_NODE:
@@ -63,7 +63,7 @@ def getfrob():
         dom = __get_web_page_dom(url)
 
         # get the frob
-        frob = getText(dom.getElementsByTagName("frob")[0].childNodes)
+        frob = get_text(dom.getElementsByTagName("frob")[0].childNodes)
 
         # Free the DOM
         dom.unlink()
@@ -119,7 +119,7 @@ def froblogin(frob, perms):
         dom = __get_web_page_dom(url)
 
         # get the token and user-id
-        token = getText(dom.getElementsByTagName("token")[0].childNodes)
+        token = get_text(dom.getElementsByTagName("token")[0].childNodes)
         nsid = dom.getElementsByTagName("user")[0].getAttribute("nsid")
 
         # Free the DOM
@@ -244,7 +244,7 @@ if __name__ == '__main__':
     urls = []
     for set in sets:
         pid = set.getAttribute("id")
-        dir = getText(set.getElementsByTagName("title")[0].childNodes)
+        dir = get_text(set.getElementsByTagName("title")[0].childNodes)
         # Normalize to ASCII
         dir = unicodedata.normalize(
             'NFKD',
