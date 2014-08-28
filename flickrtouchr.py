@@ -16,14 +16,15 @@
 # License:       		Apache 2.0 - http://www.apache.org/licenses/LICENSE-2.0.html
 #
 
+import unicodedata
+import sys
+
 import xml.dom.minidom
 import webbrowser
 import urlparse
 import urllib2
-import unicodedata
 import cPickle
 import hashlib
-import sys
 import os
 
 API_KEY = "e224418b91b4af4e8cdb0564716fa9bd"
