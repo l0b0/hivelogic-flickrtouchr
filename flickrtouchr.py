@@ -29,29 +29,26 @@ import os
 
 API_KEY = "e224418b91b4af4e8cdb0564716fa9bd"
 SHARED_SECRET = "7cddb9c9716501a0"
+SECRET_AND_API_KEY = SHARED_SECRET + "api_key" + API_KEY
 
 API_SERVICES_URL = 'https://api.flickr.com/services/'
 API_REST_URL = API_SERVICES_URL + 'rest/'
 API_AUTH_URL = API_SERVICES_URL + 'auth/'
+API_KEY_PARAMETER = "api_key=" + API_KEY
+
+FROB_CACHE_FILE = "touchr.frob.cache"
 
 
 def get_text_nodes_string(nodelist):
-    rc = ""
-    for node in nodelist:
-        if node.nodeType == node.TEXT_NODE:
-            rc = rc + node.data
-    return rc.encode("utf-8")
+    text_nodes = filter(__node_is_text, nodelist)
+    text_nodes_string = ''.join(node.data for node in text_nodes)
+    return text_nodes_string.encode("utf-8")
 
 
 def get_frob():
-    # Create our signing string
-    string = SHARED_SECRET + "api_key" + API_KEY + "methodflickr.auth.getFrob"
-    hash = hashlib.md5(string).hexdigest()
-
     # Formulate the request
-    url = API_REST_URL
-    url += "?method=flickr.auth.getFrob"
-    url += "&api_key=" + API_KEY + "&api_sig=" + hash
+    url = API_REST_URL + "?method=flickr.auth.getFrob"
+    url += "&" + API_KEY_PARAMETER + "&api_sig=" + __get_api_signature()
 
     try:
         dom = __get_web_page_dom(url)
@@ -71,14 +68,10 @@ def get_frob():
 
 
 def get_authorization(frob, perms):
-    string = SHARED_SECRET + "api_key" + API_KEY + \
-        "frob" + frob + "perms" + perms
-    hash = hashlib.md5(string).hexdigest()
-
     # Formulate the request
-    url = API_AUTH_URL
-    url += "?api_key=" + API_KEY + "&perms=" + perms
-    url += "&frob=" + frob + "&api_sig=" + hash
+    url = API_AUTH_URL + "?" + API_KEY_PARAMETER + "&perms=" + perms
+    url += "&frob=" + frob + "&api_sig=" + __get_authorization_signature(
+        frob, perms)
 
     # Tell the user what's happening
     print "In order to allow FlickrTouchr to read your photos and favourites"
@@ -97,36 +90,33 @@ def get_authorization(frob, perms):
     sys.stdin.readline()
 
     # Now, try and retrieve a token
-    string = SHARED_SECRET + "api_key" + API_KEY + "frob" + frob + \
-        "methodflickr.auth.getToken"
+    string = SECRET_AND_API_KEY + "frob" + frob + "methodflickr.auth.getToken"
     hash = hashlib.md5(string).hexdigest()
 
     # Formulate the request
     url = API_REST_URL + "?method=flickr.auth.getToken"
-    url += "&api_key=" + API_KEY + "&frob=" + frob
+    url += "&" + API_KEY_PARAMETER + "&frob=" + frob
     url += "&api_sig=" + hash
 
-    # See if we get a token
     try:
-        dom = __get_web_page_dom(url)
-
-        # get the token and user-id
-        token = get_text_nodes_string(
-            dom.getElementsByTagName("token")[0].childNodes)
-        nsid = dom.getElementsByTagName("user")[0].getAttribute("nsid")
-
-        # Free the DOM
-        dom.unlink()
-
-        # Return the token and userid
-        return (nsid, token)
+        return __get_token_and_nsid(url)
     except:
         raise Exception("Login failed")
 
 
+def __get_token_and_nsid(url):
+    dom = __get_web_page_dom(url)
+    # get the token and user-id
+    token = get_text_nodes_string(
+        dom.getElementsByTagName("token")[0].childNodes)
+    nsid = dom.getElementsByTagName("user")[0].getAttribute("nsid")
+    dom.unlink()
+    return (nsid, token)
+
+
 def sign_request(url, token):
     query = urlparse.urlparse(url).query
-    query += "&api_key=" + API_KEY + "&auth_token=" + token
+    query += "&" + API_KEY_PARAMETER + "&auth_token=" + token
     params = query.split('&')
 
     # Create the string to hash
@@ -139,7 +129,8 @@ def sign_request(url, token):
     hash = hashlib.md5(string).hexdigest()
 
     # Now, append the api_key, and the api_sig args
-    url += "&api_key=" + API_KEY + "&auth_token=" + token + "&api_sig=" + hash
+    url += "&" + API_KEY_PARAMETER
+    url += "&auth_token=" + token + "&api_sig=" + hash
 
     # Return the signed url
     return url
@@ -182,6 +173,16 @@ def get_photo(id, token, filename):
         print "Failed to retrieve photo id " + id
 
 
+def __get_api_signature():
+    string = SECRET_AND_API_KEY + "methodflickr.auth.getFrob"
+    return hashlib.md5(string).hexdigest()
+
+
+def __get_authorization_signature(frob, perms):
+    string = SECRET_AND_API_KEY + "frob" + frob + "perms" + perms
+    return hashlib.md5(string).hexdigest()
+
+
 def __get_web_page_dom(page_url):
     return xml.dom.minidom.parse(__get_web_page(page_url))
 
@@ -190,17 +191,21 @@ def __get_web_page(page_url):
     return urllib2.urlopen(page_url)
 
 
-def main():
-    # The first, and only argument needs to be a directory
+def __node_is_text(node):
+    return node.nodeType == node.TEXT_NODE
+
+
+def __parse_arguments():
     try:
         os.chdir(sys.argv[1])
     except:
         print "usage: %s directory" % sys.argv[0]
         sys.exit(1)
 
-    # First things first, see if we have a cached user and auth-token
+
+def __get_configuration():
     try:
-        cache = open("touchr.frob.cache", "r")
+        cache = open(FROB_CACHE_FILE, "r")
         config = cPickle.load(cache)
         cache.close()
 
@@ -210,11 +215,14 @@ def main():
         config = {"version": 1, "user": user, "token": token}
 
         # Save it for future use
-        cache = open("touchr.frob.cache", "w")
+        cache = open(FROB_CACHE_FILE, "w")
         cPickle.dump(config, cache)
         cache.close()
 
-    # Now, construct a query for the list of photo sets
+    return config
+
+
+def __get_photo_urls(config):
     url = API_REST_URL + "?method=flickr.photosets.getList"
     url += "&user_id=" + config["user"]
     url = sign_request(url, config["token"])
@@ -228,16 +236,10 @@ def main():
     urls = []
     for set in sets:
         pid = set.getAttribute("id")
-        dir = get_text_nodes_string(
-            set.getElementsByTagName("title")[0].childNodes)
-        # Normalize to ASCII
-        dir = unicodedata.normalize(
-            'NFKD',
-            dir.decode("utf-8", "ignore")).encode('ASCII', 'ignore')
+        dir = __get_set_directory(set)
 
         # Build the list of photos
-        url = API_REST_URL + "?method=flickr.photosets.getPhotos"
-        url += "&photoset_id=" + pid
+        url = __get_set_url(pid)
 
         # Append to our list of urls
         urls.append((url, dir))
@@ -252,7 +254,26 @@ def main():
     # Add the user's Favourites
     url = API_REST_URL + "?method=flickr.favorites.getList"
     urls.append((url, "Favourites"))
+    return urls
 
+
+def __get_set_directory(set):
+    dir = get_text_nodes_string(
+        set.getElementsByTagName("title")[0].childNodes)
+    # Normalize to ASCII
+    dir = unicodedata.normalize(
+        'NFKD',
+        dir.decode("utf-8", "ignore")).encode('ASCII', 'ignore')
+    return dir
+
+
+def __get_set_url(pid):
+    url = API_REST_URL + "?method=flickr.photosets.getPhotos"
+    url += "&photoset_id=" + pid
+    return url
+
+
+def __get_photos(config, urls):
     # Time to get the photos
     inodes = {}
     for (url, dir) in urls:
@@ -267,24 +288,12 @@ def main():
         pages = page = 1
 
         while page <= pages:
-            request = url + "&page=" + str(page)
-
-            # Sign the url
-            request = sign_request(request, config["token"])
-
-            dom = __get_web_page_dom(request)
+            dom = __get_photos_page(config, page, url)
 
             # Get the total
-            try:
-                pages = int(dom.getElementsByTagName(
-                    "photo")[0].parentNode.getAttribute("pages"))
-            except IndexError:
-                pages = 0
-
+            pages = __get_page_count(dom)
             # Grab the photos
             for photo in dom.getElementsByTagName("photo"):
-                # Tell the user we're grabbing the file
-
                 # Grab the id
                 photoid = photo.getAttribute("id")
 
@@ -292,7 +301,7 @@ def main():
                 target = dir + "/" + photoid + ".jpg"
 
                 # Skip files that exist
-                if os.access(target, os.R_OK):
+                if __path_is_accessible(target):
                     inodes[photoid] = target
                     sys.stdout.write('.')
                     sys.stdout.flush()
@@ -302,18 +311,45 @@ def main():
                     print photo.getAttribute("title").encode("utf8") + \
                         " ... in set ... " + dir
 
-                # Look it up in our dictionary of inodes first
-                if photoid in inodes and inodes[photoid] and \
-                        os.access(inodes[photoid], os.R_OK):
-                    # woo, we have it already, use a hard-link
+                if __photo_inode_is_accessible(photoid, inodes):
                     os.link(inodes[photoid], target)
                 else:
                     inodes[photoid] = get_photo(
                         photo.getAttribute("id"), config["token"], target)
 
             # Move on the next page
-            page = page + 1
-    print ""
+            page += 1
+
+
+def __get_photos_page(config, page, url):
+    request = url + "&page=" + str(page)
+    signed_request = sign_request(request, config["token"])
+    return __get_web_page_dom(signed_request)
+
+
+def __get_page_count(dom):
+    try:
+        return int(dom.getElementsByTagName(
+            "photo")[0].parentNode.getAttribute("pages"))
+    except IndexError:
+        return 0
+
+
+def __path_is_accessible(path):
+    return os.access(path, os.R_OK)
+
+
+def __photo_inode_is_accessible(photoid, inodes):
+    return photoid in inodes and inodes[photoid] and __path_is_accessible(
+        inodes[photoid])
+
+
+def main():
+    __parse_arguments()
+
+    config = __get_configuration()
+    urls = __get_photo_urls(config)
+    __get_photos(config, urls)
 
 
 if __name__ == '__main__':
